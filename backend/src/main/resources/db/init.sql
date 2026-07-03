@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS t_order (
     seller_id BIGINT NOT NULL COMMENT '卖家ID',
     total_amount DECIMAL(10,2) NOT NULL COMMENT '总金额',
     status TINYINT DEFAULT 0 COMMENT '状态: 0-待支付 1-已支付 2-已发货 3-已完成 4-已取消',
+    pay_expire_time DATETIME COMMENT '支付过期时间',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX idx_buyer (buyer_id),
@@ -118,6 +119,23 @@ INSERT INTO t_token_product (name, description, price, stock, category_id, selle
 ('API调用Token - 1000次', '包含1000次API调用次数，适用于开发测试', 99.00, 100, 2, 1, 1),
 ('会员Token - 月度', '月度会员专属Token，享受会员特权', 19.90, 999, 3, 1, 1),
 ('数据访问Token - 标准版', '标准版数据访问权限，有效期30天', 49.00, 50, 1, 1, 1);
+
+-- 购物车表
+CREATE TABLE IF NOT EXISTS t_cart (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '购物车ID',
+    user_id BIGINT NOT NULL COMMENT '用户ID',
+    token_id BIGINT NOT NULL COMMENT 'Token商品ID',
+    token_name VARCHAR(100) COMMENT 'Token名称',
+    token_image VARCHAR(500) COMMENT 'Token图片',
+    price DECIMAL(10,2) NOT NULL COMMENT '单价',
+    quantity INT NOT NULL DEFAULT 1 COMMENT '数量',
+    selected TINYINT DEFAULT 1 COMMENT '是否选中: 0-未选中 1-选中',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    INDEX idx_user (user_id),
+    INDEX idx_token (token_id),
+    UNIQUE KEY uk_user_token (user_id, token_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='购物车表';
 
 -- 收藏表
 CREATE TABLE IF NOT EXISTS t_favorite (

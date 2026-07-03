@@ -3,7 +3,9 @@ package com.tokenshop.service.impl;
 import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.tokenshop.common.BusinessException;
 import com.tokenshop.common.PageResult;
+import com.tokenshop.common.ResultCode;
 import com.tokenshop.entity.Order;
 import com.tokenshop.entity.OrderItem;
 import com.tokenshop.entity.TokenProduct;
@@ -55,22 +57,33 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     @Override
     @Transactional
     public Order createOrder(Long buyerId, Long tokenId, Integer quantity) {
+        // 检查 Token 是否存在
         TokenProduct token = tokenProductMapper.selectById(tokenId);
         if (token == null) {
-            throw new RuntimeException("Token不存在");
-        }
-        if (token.getStock() < quantity) {
-            throw new RuntimeException("库存不足");
+            throw new BusinessException(ResultCode.TOKEN_NOT_FOUND);
         }
 
+        // 检查 Token 是否下架
+        if (token.getStatus() != 1) {
+            throw new BusinessException(ResultCode.TOKEN_OFFLINE);
+        }
+
+        // 检查库存
+        if (token.getStock() < quantity) {
+            throw new BusinessException(ResultCode.STOCK_INSUFFICIENT);
+        }
+
+        // 创建订单
         Order order = new Order();
         order.setOrderNo(IdUtil.getSnowflakeNextIdStr());
         order.setBuyerId(buyerId);
         order.setSellerId(token.getSellerId());
         order.setTotalAmount(token.getPrice().multiply(new BigDecimal(quantity)));
         order.setStatus(0);
+        order.setPayExpireTime(LocalDateTime.now().plusMinutes(30));
         this.save(order);
 
+        // 创建订单明细
         OrderItem item = new OrderItem();
         item.setOrderId(order.getId());
         item.setTokenId(tokenId);
@@ -80,6 +93,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         item.setSubtotal(order.getTotalAmount());
         orderItemMapper.insert(item);
 
+        // 扣减库存
         token.setStock(token.getStock() - quantity);
         tokenProductMapper.updateById(token);
 
@@ -91,11 +105,23 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     public void cancelOrder(Long orderId) {
         Order order = this.getById(orderId);
         if (order == null) {
-            throw new RuntimeException("订单不存在");
+            throw new BusinessException(ResultCode.ORDER_NOT_FOUND);
         }
         if (order.getStatus() != 0) {
-            throw new RuntimeException("只能取消待支付订单");
+            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, "只能取消待支付订单");
         }
+        
+        // 恢复库存
+        List<OrderItem> items = orderItemMapper.selectList(
+                new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderId));
+        for (OrderItem item : items) {
+            TokenProduct token = tokenProductMapper.selectById(item.getTokenId());
+            if (token != null) {
+                token.setStock(token.getStock() + item.getQuantity());
+                tokenProductMapper.updateById(token);
+            }
+        }
+
         order.setStatus(4);
         this.updateById(order);
     }
@@ -105,10 +131,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     public void confirmOrder(Long orderId) {
         Order order = this.getById(orderId);
         if (order == null) {
-            throw new RuntimeException("订单不存在");
+            throw new BusinessException(ResultCode.ORDER_NOT_FOUND);
         }
         if (order.getStatus() != 2) {
-            throw new RuntimeException("只能确认已发货订单");
+            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, "只能确认已发货订单");
         }
         order.setStatus(3);
         this.updateById(order);

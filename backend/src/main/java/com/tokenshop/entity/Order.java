@@ -18,6 +18,7 @@ public class Order {
     private Long sellerId;
     private BigDecimal totalAmount;
     private Integer status;
+    private LocalDateTime payExpireTime;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
@@ -37,6 +38,8 @@ public class Order {
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
     public Integer getStatus() { return status; }
     public void setStatus(Integer status) { this.status = status; }
+    public LocalDateTime getPayExpireTime() { return payExpireTime; }
+    public void setPayExpireTime(LocalDateTime payExpireTime) { this.payExpireTime = payExpireTime; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
